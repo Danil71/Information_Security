@@ -13,22 +13,20 @@ INCLUDEPATH += $$OPENSSL_ROOT/include
 LIBS += -L$$OPENSSL_ROOT/lib/VC/ -llibcrypto64MD -llibssl64MD
 
 SOURCES += \
-    main.cpp \
-    mainwindow.cpp \
-    src/crypto.cpp \
     src/main.cpp \
-    src/mainwindow.cpp \
-    src/usermanager.cpp
+    src/adminwindow.cpp \
+    src/crypto.cpp \
+    src/loginwindow.cpp \
+    src/usermanager.cpp \
+    src/userwindow.cpp
 
 HEADERS += \
+    headers/adminwindow.h \
     headers/crypto.h \
-    headers/mainwindow.h \
+    headers/loginwindow.h \
     headers/usermanager.h \
-    mainwindow.h \
-    src/usermanager.h
-
-FORMS += \
-    mainwindow.ui
+    headers/userwindow.h \
+    headers/usermanager.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
