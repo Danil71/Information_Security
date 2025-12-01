@@ -5,21 +5,25 @@
 #include <QSqlError>
 #include <QDir>
 #include <QDebug>
+#include <QMessageBox>
 
 UserManager::UserManager(QString encPath)
     : encFile(encPath), tempFile("users_temp.sqlite") {}
 
 UserManager::~UserManager() {}
 
-// ===============================================================
-// 1) OPEN DATABASE
-// ===============================================================
 bool UserManager::open(const QString &keyPhrase)
 {
     // Если users.enc ещё нет → создаём SQLite файл
     if (!QFile::exists(encFile))
     {
         qDebug() << "[INFO] encrypted DB not found → NEW created";
+
+        QMessageBox::information(
+            nullptr,
+            "Создание базы данных",
+            "Файл зашифрованной БД отсутствовал.\nСоздан новый файл users.enc."
+            );
 
         // --- создаём SQLite с таблицей ---
         QSqlDatabase init = QSqlDatabase::addDatabase("QSQLITE","init");
@@ -58,10 +62,6 @@ bool UserManager::open(const QString &keyPhrase)
         QFile(tempFile).remove(); // очищаем, база будет расшифровываться заново
     }
 
-    // ==========================================================
-    // 2) ЧИТАЕМ И РАСШИФРОВЫВАЕМ users.enc
-    // ==========================================================
-
     QFile enc(encFile);
     if(!enc.open(QIODevice::ReadOnly)){
         qDebug()<<"[ERROR] cannot open users.enc";
@@ -72,7 +72,7 @@ bool UserManager::open(const QString &keyPhrase)
     enc.close();
 
     auto dec = decryptWithHeader(keyPhrase, encData);
-    if(!dec){
+    if(dec->isEmpty() || !dec->startsWith("SQLite format 3")){
         qDebug()<<"[FAIL] wrong encryption key";
         return false;
     }
@@ -82,9 +82,6 @@ bool UserManager::open(const QString &keyPhrase)
     t.write(*dec);
     t.close();
 
-    // ==========================================================
-    // 3) ПОДКЛЮЧАЕМ SQLITE
-    // ==========================================================
     db = QSqlDatabase::addDatabase("QSQLITE","live");
     db.setDatabaseName(tempFile);
 
@@ -97,9 +94,6 @@ bool UserManager::open(const QString &keyPhrase)
     return true;
 }
 
-// ===============================================================
-// SAVE + RE-ENCRYPT
-// ===============================================================
 void UserManager::closeAndSave(const QString &keyPhrase)
 {
     if(db.isOpen()){
@@ -121,9 +115,6 @@ void UserManager::closeAndSave(const QString &keyPhrase)
     }
 }
 
-// ===============================================================
-// ADMIN CHECK
-// ===============================================================
 bool UserManager::ensureAdminExists(){
     QSqlQuery q(db);
     q.exec("SELECT COUNT(*) FROM users WHERE username='ADMIN'");
@@ -138,9 +129,6 @@ bool UserManager::ensureAdminExists(){
     return true;
 }
 
-// ===============================================================
-// USER FUNCTIONS
-// ===============================================================
 bool UserManager::login(const QString &u,const QString &pass){
     auto R=getUser(u);
     if(!R || R->blocked) return false;
@@ -166,7 +154,7 @@ QList<UserRecord> UserManager::getUsers(){
 
 bool UserManager::addUser(QString name){
     QSqlQuery q(db);
-    q.prepare("INSERT INTO users VALUES(:u,'',0,0,0,0,:d)");
+    q.prepare("INSERT INTO users VALUES(:u,'',0,0,0,1,:d)");
     q.bindValue(":u",name);
     q.bindValue(":d",QDate::currentDate().toString(Qt::ISODate));
     return q.exec();
@@ -194,6 +182,30 @@ bool UserManager::blockUser(QString name,bool st){
     q.prepare("UPDATE users SET blocked=:b WHERE username=:u");
     q.bindValue(":b",st?1:0);
     q.bindValue(":u",name);
+    return q.exec();
+}
+
+bool UserManager::setMinLength(QString name, int value){
+    QSqlQuery q(db);
+    q.prepare("UPDATE users SET min_len=:v WHERE username=:u");
+    q.bindValue(":v", value);
+    q.bindValue(":u", name);
+    return q.exec();
+}
+
+bool UserManager::setExpiration(QString name, int months){
+    QSqlQuery q(db);
+    q.prepare("UPDATE users SET exp=:m WHERE username=:u");
+    q.bindValue(":m", months);
+    q.bindValue(":u", name);
+    return q.exec();
+}
+
+bool UserManager::setRestrictions(QString name, bool enabled){
+    QSqlQuery q(db);
+    q.prepare("UPDATE users SET restr=:r WHERE username=:u");
+    q.bindValue(":r", enabled ? 1 : 0);
+    q.bindValue(":u", name);
     return q.exec();
 }
 

@@ -3,6 +3,8 @@
 
 #include <QWidget>
 #include <QTimer>
+#include <QMenuBar>
+#include <QCloseEvent>
 
 class QTableWidget;
 class QPushButton;
@@ -16,17 +18,21 @@ public:
     ~AdminWindow();
 
 private slots:
+    void closeEvent(QCloseEvent *event) override;
+    void showAbout();
     void onAddUser();
     void onDeleteUser();
     void onBlockUser();
     void onUnblockUser();
     void onChangePassword();
     void onSaveExit();
+    void onCellEdited(int row, int col);
+    void onRestrictionsDoubleClicked(int row, int col);
 
 private:
     UserManager &manager;
     QString keyPhrase;
-
+    QMenuBar *menu;
     QTableWidget *table;
     QPushButton *btnAdd, *btnDelete, *btnBlock, *btnUnblock, *btnChangePass, *btnSaveExit, *btnRefresh;
     void fillTable();

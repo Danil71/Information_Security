@@ -14,12 +14,23 @@ AdminWindow::AdminWindow(UserManager &mgr, const QString &keyPhrase_, QWidget *p
     setWindowTitle("Admin — управление пользователями");
     resize(800,400);
 
+    menu = new QMenuBar(this);
+
+    QMenu *menuHelp = menu->addMenu("Справка");
+
+    QAction *actAbout = new QAction("О программе", this);
+    menuHelp->addAction(actAbout);
+
+    connect(actAbout, &QAction::triggered, this, &AdminWindow::showAbout);
+
     table = new QTableWidget();
-    table->setColumnCount(6);
-    table->setHorizontalHeaderLabels(QStringList() << "Имя" << "Хеш пароля" << "Блок" << "Мин.длина" << "Срок(мес)" << "Ограничения");
+    table->setColumnCount(5);
+    table->setHorizontalHeaderLabels(QStringList() << "Имя" << "Блок" << "Мин.длина" << "Срок(мес)" << "Ограничения");
     table->horizontalHeader()->setStretchLastSection(true);
     table->setSelectionBehavior(QAbstractItemView::SelectRows);
-    table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    table->setEditTriggers(
+        QAbstractItemView::DoubleClicked
+        );
 
     btnAdd = new QPushButton("Добавить");
     btnDelete = new QPushButton("Удалить");
@@ -37,6 +48,8 @@ AdminWindow::AdminWindow(UserManager &mgr, const QString &keyPhrase_, QWidget *p
     connect(btnChangePass, &QPushButton::clicked, this, &AdminWindow::onChangePassword);
     connect(btnSaveExit, &QPushButton::clicked, this, &AdminWindow::onSaveExit);
     connect(btnRefresh, &QPushButton::clicked, this, &AdminWindow::fillTable);
+    connect(table, &QTableWidget::cellChanged, this, &AdminWindow::onCellEdited);
+    connect(table, &QTableWidget::cellDoubleClicked, this, &AdminWindow::onRestrictionsDoubleClicked);
 
     QHBoxLayout *hb = new QHBoxLayout();
     hb->addWidget(btnAdd);
@@ -49,6 +62,7 @@ AdminWindow::AdminWindow(UserManager &mgr, const QString &keyPhrase_, QWidget *p
     hb->addWidget(btnSaveExit);
 
     QVBoxLayout *vb = new QVBoxLayout();
+    vb->setMenuBar(menu);
     vb->addWidget(table);
     vb->addLayout(hb);
     setLayout(vb);
@@ -66,11 +80,10 @@ void AdminWindow::fillTable()
     int r = 0;
     for (auto &u : users) {
         table->setItem(r,0, new QTableWidgetItem(u.username));
-        table->setItem(r,1, new QTableWidgetItem(u.passwordHash));
-        table->setItem(r,2, new QTableWidgetItem(u.blocked ? "Да" : "Нет"));
-        table->setItem(r,3, new QTableWidgetItem(QString::number(u.minLength)));
-        table->setItem(r,4, new QTableWidgetItem(QString::number(u.expirationMonths)));
-        table->setItem(r,5, new QTableWidgetItem(u.restrictionsEnabled ? "Да" : "Нет"));
+        table->setItem(r,1, new QTableWidgetItem(u.blocked ? "Да" : "Нет"));
+        table->setItem(r,2, new QTableWidgetItem(QString::number(u.minLength)));
+        table->setItem(r,3, new QTableWidgetItem(QString::number(u.expirationMonths)));
+        table->setItem(r,4, new QTableWidgetItem(u.restrictionsEnabled ? "Да" : "Нет"));
         r++;
     }
 }
@@ -113,6 +126,69 @@ void AdminWindow::onBlockUser()
     fillTable();
 }
 
+void AdminWindow::onCellEdited(int row, int col)
+{
+    disconnect(table, &QTableWidget::cellChanged,
+               this, &AdminWindow::onCellEdited);
+
+    QString user = table->item(row,0)->text();
+    if (col == 2) {
+        bool ok; int val = table->item(row,col)->text().toInt(&ok);
+        if (!ok || val < 0 || val > 200 || !manager.setMinLength(user,val)) {
+            QMessageBox::warning(this,"Ошибка","Мин. длина 0-200");
+        }
+    }
+
+    else if (col == 3) {
+        bool ok; int months = table->item(row,col)->text().toInt(&ok);
+        if (!ok || months < 0 || months > 60 || !manager.setExpiration(user,months)) {
+            QMessageBox::warning(this,"Ошибка","Срок 0-60 месяцев");
+        }
+    }
+
+    fillTable();
+
+    connect(table, &QTableWidget::cellChanged,
+            this, &AdminWindow::onCellEdited);
+
+}
+
+void AdminWindow::showAbout()
+{
+    QMessageBox msg(this);
+    msg.setWindowTitle("О программе");
+    msg.setIcon(QMessageBox::Information);
+
+    msg.setText(
+        "<div align='center'>"
+        "<b>Лабораторная 1</b><br>"
+        "Автор: Путинцев Даниил Максимович<br>"
+        "<b>Вариант:</b> 23<br><br>"
+        "<b>Индивидуальное задание:</b><br>"
+        "Ограничение на выбираемые пароли: наличие цифр и знаков арифметики (+ - * /)<br>"
+        "Используемый режим шифрования DES: <b>CFB</b><br>"
+        "Добавление к ключу случайного значения: <b>Да</b><br>"
+        "Используемый алгоритм хеширования паролей: <b>MD5</b><br>"
+        );
+
+    msg.setStandardButtons(QMessageBox::Ok);
+    msg.exec();
+}
+
+void AdminWindow::onRestrictionsDoubleClicked(int row, int col)
+{
+    if (col != 4) return;
+
+    QString user = table->item(row,0)->text();
+    bool curr = (table->item(row,col)->text() == "Да");
+    bool next = !curr;
+
+    if(manager.setRestrictions(user,next))
+        table->item(row,col)->setText(next ? "Да" : "Нет");
+    else
+        QMessageBox::warning(this,"Ошибка","Не удалось обновить ограничение");
+}
+
 void AdminWindow::onUnblockUser()
 {
     QString name = selectedUser();
@@ -132,7 +208,6 @@ void AdminWindow::onChangePassword()
     QString confirm = QInputDialog::getText(this,"Подтверждение","Подтвердите пароль:", QLineEdit::Password, "", &ok);
     if (!ok) return;
     if (newp != confirm) { QMessageBox::warning(this,"Ошибка","Пароли не совпадают"); return; }
-    // Проверка ограничений варианта 23 если включено (тут простая: цифра + arith)
     auto u = manager.getUser(name);
     if (u && u->restrictionsEnabled) {
         bool hasDigit=false, hasArith=false;
@@ -151,10 +226,12 @@ void AdminWindow::onChangePassword()
 
 void AdminWindow::onSaveExit()
 {
-    // ask for key
-    bool ok=false;
-    QString kp = QInputDialog::getText(this,"Ключ шифрования","Введите ключ шифрования для сохранения:", QLineEdit::Password,"",&ok);
-    if (!ok) return;
-    manager.closeAndSave(kp);
+    manager.closeAndSave(keyPhrase);
     close();
+}
+
+void AdminWindow::closeEvent(QCloseEvent *event)
+{
+    manager.closeAndSave(keyPhrase);
+    event->accept();
 }

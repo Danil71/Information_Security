@@ -96,7 +96,6 @@ void UserWindow::onChangePassword()
 
 void UserWindow::onExit()
 {
-    // request key to save DB
     bool ok=false;
     QString kp = QInputDialog::getText(this,"Ключ шифрования","Введите ключ шифрования для сохранения:", QLineEdit::Password,"",&ok);
     if (!ok) return;

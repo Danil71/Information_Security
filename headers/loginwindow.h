@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QEventLoop>
+#include <QCloseEvent>
 
 class QLabel;
 class QLineEdit;
@@ -16,22 +17,23 @@ public:
     explicit LoginWindow(UserManager &mgr, const QString &keyPhrase, QWidget *parent = nullptr);
     ~LoginWindow();
 
-    // modal-like exec
     bool exec();
     QString getUsername() const { return username; }
+    QString getPassword() const { return password; }
 
 private slots:
+    void closeEvent(QCloseEvent *event) override;
     void onLoginClicked();
     void onCancelClicked();
 
 private:
+    int attempts = 0;
     UserManager &manager;
     QString keyPhrase;
     QEventLoop loop;
     bool accepted = false;
     QString username, password;
 
-    // UI
     QLabel *lblUser;
     QLabel *lblPass;
     QLineEdit *editUser;

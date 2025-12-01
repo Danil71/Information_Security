@@ -13,8 +13,6 @@ int main(int argc, char *argv[])
 
     QString encPath = "users.enc";
 
-    // Ввод парольной фразы (ключ)
-    // Для простоты — используем QInputDialog здесь
     bool ok=false;
     QString key = QInputDialog::getText(nullptr,"Ключ шифрования","Введите ключ шифрования:", QLineEdit::Password,"",&ok);
     if (!ok) return 0;
@@ -25,10 +23,8 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // Показываем окно входа
     LoginWindow loginWnd(manager, key);
     if (!loginWnd.exec()) {
-        // user cancelled
         manager.closeAndSave(key);
         return 0;
     }
@@ -38,8 +34,6 @@ int main(int argc, char *argv[])
         AdminWindow w(manager, key);
         w.show();
         int res = a.exec();
-        // on exit ensure saved if not yet
-        // manager.closeAndSave(key); // admin window asks for key before saving
         return res;
     } else {
         UserWindow w(manager, user, key);

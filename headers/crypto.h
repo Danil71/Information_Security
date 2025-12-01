@@ -5,27 +5,11 @@
 #include <QString>
 #include <optional>
 
-/*
- * crypto.h
- *
- * Заголовок для крипто-утилит:
- * - md5HashHex      : MD5-хеш строки в hex (QByteArray)
- * - deriveDesKey    : получить 8-байтный DES-ключ из keyPhrase + salt
- * - genRandomBytes  : сгенерировать случайные байты (для salt/iv)
- * - encryptCFBWithHeader / decryptCFBWithHeader :
- *       удобные функции для работы с форматом файла:
- *         [MAGIC(8)][SALT(8)][IV(8)][CIPHERTEXT...]
- *
- * Примечание: реализация шифрования использует OpenSSL (EVP API).
- * В .pro нужно линковать -lcrypto (или добавить соответствующие LIBS/INCLUDEPATH для Windows).
- */
-
 static const int CRYPTO_MAGIC_LEN = 8;
 static const int CRYPTO_SALT_LEN = 8;
 static const int CRYPTO_IV_LEN   = 8;
-static const char CRYPTO_MAGIC[CRYPTO_MAGIC_LEN+1] = "QTAUTH23"; // pad to 8 bytes if needed
+static const char CRYPTO_MAGIC[CRYPTO_MAGIC_LEN+1] = "QTAUTH23";
 
-// Возвращает MD5-хеш (hex) от переданной строки, как QByteArray (ASCII hex)
 QByteArray md5HashHex(const QString &password);
 
 // Возвращает 8-байтный ключ DES, полученный из md5(keyPhrase + salt). left(8)

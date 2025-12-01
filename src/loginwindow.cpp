@@ -52,7 +52,7 @@ LoginWindow::~LoginWindow(){}
 bool LoginWindow::exec()
 {
     this->show();
-    loop.exec(); // wait until accepted or cancelled
+    loop.exec();
     this->hide();
     return accepted;
 }
@@ -73,14 +73,31 @@ void LoginWindow::onLoginClicked()
         else { accepted = false; loop.quit(); return; }
     }
 
+    if (manager.getUser(u)->blocked) {
+        QMessageBox::critical(this,"Доступ запрещён","Этот пользователь заблокирован администратором!");
+        loop.quit();
+        return;
+    }
+
     if (manager.login(u,p)) {
         username = u;
         password = p;
         accepted = true;
         loop.quit();
     } else {
-        QMessageBox::warning(this,"Ошибка","Неверный пароль");
-        // allow retries
+        attempts++;
+
+        if (attempts >= 3) {
+            QMessageBox::critical(this,"Ошибка","Количество попыток исчерпано. Приложение будет закрыто.");
+            loop.quit(); // мгновенное завершение работы
+            return;
+        }
+
+        QMessageBox::warning(
+            this,
+            "Ошибка",
+            "Неверный пароль!\nПопыток осталось: " + QString::number(3 - attempts)
+            );
     }
 }
 
@@ -88,4 +105,10 @@ void LoginWindow::onCancelClicked()
 {
     accepted = false;
     loop.quit();
+}
+
+void LoginWindow::closeEvent(QCloseEvent *event)
+{
+    manager.closeAndSave(keyPhrase);
+    event->accept();
 }

@@ -19,16 +19,16 @@ struct UserRecord {
 
 class UserManager {
 private:
-    QString encFile;        // encrypted file: users.enc
-    QString tempFile;       // decrypted sqlite file
+    QString encFile;
+    QString tempFile;
     QSqlDatabase db;
 
 public:
     UserManager(QString encFilePath);
     ~UserManager();
 
-    bool open(const QString &keyPhrase);     // decrypt → load SQLite
-    void closeAndSave(const QString &keyPhrase); // dump SQLite → encrypt
+    bool open(const QString &keyPhrase);
+    void closeAndSave(const QString &keyPhrase);
 
     // user operations
     bool login(const QString &u, const QString &pass);
@@ -38,9 +38,11 @@ public:
     bool deleteUser(QString name);
     bool setPassword(QString name, QString newPass);
     bool blockUser(QString name, bool status);
+    bool setMinLength(QString name, int value);
+    bool setExpiration(QString name, int months);
+    bool setRestrictions(QString name, bool enabled);
     std::optional<UserRecord> getUser(QString name);
 
-    // helpers
     bool ensureAdminExists();
 };
 
