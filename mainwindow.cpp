@@ -7,7 +7,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowTitle("SHA-1 Хеширование (Лаб. работа)");
-    resize(900, 600);
+    resize(550, 400);
 
     QWidget *central = new QWidget(this);
     setCentralWidget(central);
@@ -18,15 +18,14 @@ MainWindow::MainWindow(QWidget *parent)
     QGroupBox *groupStudent = new QGroupBox("Данные студента");
     QGridLayout *layStudent = new QGridLayout(groupStudent);
 
-    layStudent->addWidget(new QLabel("ФИО:"),          0, 0);
-    editFio = new QLineEdit(); layStudent->addWidget(editFio, 0, 1);
+    layStudent->addWidget(new QLabel("ФИО:"), 0, 0);
+    editFio = new QLineEdit("Путинцев Даниил Максимович"); layStudent->addWidget(editFio, 0, 1);
+    editFio->setReadOnly(true);
 
-    layStudent->addWidget(new QLabel("Группа:"),       1, 0);
-    editGroup = new QLineEdit(); layStudent->addWidget(editGroup, 1, 1);
-
-    layStudent->addWidget(new QLabel("Вариант:"),      2, 0);
+    layStudent->addWidget(new QLabel("Вариант хэш-функции:"), 1, 0);
     editVariant = new QLineEdit("SHA-1");
-    layStudent->addWidget(editVariant, 2, 1);
+    layStudent->addWidget(editVariant, 1, 1);
+    editVariant->setReadOnly(true);
 
     main->addWidget(groupStudent);
 
@@ -38,13 +37,7 @@ MainWindow::MainWindow(QWidget *parent)
     infoText = new QTextEdit();
     infoText->setReadOnly(true);
     infoText->setText(
-        "SHA-1 — криптографическая хеш-функция, преобразующая данные в 160-битный хеш (40 hex).\n\n"
-        "Основные этапы алгоритма:\n"
-        "1) Подготовка и выравнивание блока\n"
-        "2) Разбиение сообщения на блоки по 512 бит\n"
-        "3)Расширение слов до W[80]\n"
-        "4)80 раундов функции с побитовыми операциями\n"
-        "5)Итог хеша = H0|H1|H2|H3|H4"
+"SHA-1 (Secure Hash Algorithm 1) — криптографическая хеш-функция, разработанная Агентством национальной безопасности США. Она принимает сообщение произвольной длины и возвращает фиксированный хеш длиной 160 бит (20 байт), представленный как 40 шестнадцатеричных символов."
         );
     layInfo->addWidget(infoText);
     main->addWidget(groupInfo);
@@ -64,17 +57,23 @@ MainWindow::MainWindow(QWidget *parent)
     btnHash = new QPushButton("Вычислить SHA-1");
     layHash->addWidget(btnHash, 1, 0);
 
-    layHash->addWidget(new QLabel("Встроенный SHA-1"), 1, 1);
+    QLabel* builtinLabel = new QLabel("Встроенный SHA-1");
+    QLabel* customLabel = new QLabel("Разработанный SHA-1");
 
-    layHash->addWidget(new QLabel("Разработанный SHA-1"), 2, 1);
+    layHash->addWidget(builtinLabel, 1, 2);
+    layHash->addWidget(customLabel, 2, 2);
+
+    // Устанавливаем выравнивание для конкретных ячеек
+    layHash->setAlignment(builtinLabel, Qt::AlignLeft | Qt::AlignVCenter);
+    layHash->setAlignment(customLabel, Qt::AlignLeft | Qt::AlignVCenter);
 
     editHash = new QLineEdit();
     editHash->setPlaceholderText("Результат SHA-1 (встроенный)...");
-    layHash->addWidget(editHash, 1, 2);
+    layHash->addWidget(editHash, 1, 1);
 
     ourEditHash = new QLineEdit();
     ourEditHash->setPlaceholderText("Результат SHA-1 (разработанный)...");
-    layHash->addWidget(ourEditHash, 2, 2);
+    layHash->addWidget(ourEditHash, 2, 1);
 
     btnSave = new QPushButton("Сохранить в TXT");
     layHash->addWidget(btnSave, 2, 0);
@@ -106,6 +105,11 @@ void MainWindow::calcHash() {
     }
     QByteArray data = file.readAll();
     file.close();
+
+    if (data.size() < 1024) {
+        QMessageBox::warning(this, "Ошибка", "Файл должен быть не менее 1 КБ");
+        return;
+    }
 
     // Создаем объект SHA-1
     SHA1 sha;
