@@ -97,7 +97,7 @@ static const int S[8][64] = {
 static inline uint64_t permute64(const uint8_t in[8], const int* table, int table_len) {
     uint64_t out = 0;
     for (int i = 0; i < table_len; ++i) {
-        int bitpos = table[i] - 1; // 0-based
+        int bitpos = table[i] - 1;
         int byte = bitpos / 8;
         int bit = 7 - (bitpos % 8);
         uint8_t b = (in[byte] >> bit) & 1;
@@ -159,7 +159,7 @@ static inline uint32_t sbox_subst(uint64_t in48) {
     uint32_t out32 = 0;
     for (int i = 0; i < 8; ++i) {
         uint8_t six = (in48 >> (42 - 6*i)) & 0x3F;
-        int row = ((six & 0x20) >> 4) | (six & 0x01); // first and last bits
+        int row = ((six & 0x20) >> 4) | (six & 0x01);
         int col = (six >> 1) & 0x0F;
         int val = S[i][row*16 + col];
         out32 = (out32 << 4) | (val & 0xF);
@@ -178,7 +178,7 @@ static inline void final_permutation(const uint8_t in[8], uint8_t out[8]) {
 }
 
 static inline void pc1(const uint8_t key[8], uint32_t &C, uint32_t &D) {
-    // produce 56 bits
+
     uint8_t keybits[8];
     memcpy(keybits, key, 8);
     uint64_t res = 0;
@@ -195,16 +195,16 @@ static inline void pc1(const uint8_t key[8], uint32_t &C, uint32_t &D) {
 }
 
 static inline uint64_t cd_to_subkey(uint32_t C, uint32_t D) {
-    // combine C and D into 56 bits
+
     uint64_t cd = (((uint64_t)C) << 28) | (uint64_t)D;
-    // apply PC2 (48 bits)
+
     uint64_t sub = 0;
     for (int i = 0; i < 48; ++i) {
         int pos = PC2_full[i] - 1;
         uint8_t bit = (cd >> (56 - 1 - pos)) & 1;
         sub = (sub << 1) | bit;
     }
-    return sub; // 48-bit value in low bits of uint64_t
+    return sub;
 }
 
 DES::DES() {
@@ -216,12 +216,10 @@ void DES::generateSubkeys(const std::array<uint8_t,8>& key) {
     uint32_t C = 0, D = 0;
     pc1(key.data(), C, D);
     for (int i = 0; i < 16; ++i) {
-        // left rotate C and D by SHIFTS[i]
         int s = SHIFTS[i];
         C = ((C << s) | (C >> (28 - s))) & 0x0FFFFFFF;
         D = ((D << s) | (D >> (28 - s))) & 0x0FFFFFFF;
-        uint64_t sub = cd_to_subkey(C, D); // 48 bits
-        // split into two 24-bit halves for faster XOR in some impls; here store as two 24-bit ints
+        uint64_t sub = cd_to_subkey(C, D);
         uint32_t left24 = (uint32_t)((sub >> 24) & 0xFFFFFF);
         uint32_t right24 = (uint32_t)(sub & 0xFFFFFF);
         subkeysL[i] = left24;
@@ -236,14 +234,12 @@ void DES::setKey(const std::array<uint8_t,8>& key) {
 void DES::encryptBlock(const uint8_t in[8], uint8_t out[8]) const {
     uint8_t ip[8];
     initial_permutation(in, ip);
-    // split
+
     uint32_t L = (ip[0]<<24) | (ip[1]<<16) | (ip[2]<<8) | ip[3];
     uint32_t R = (ip[4]<<24) | (ip[5]<<16) | (ip[6]<<8) | ip[7];
 
     for (int i = 0; i < 16; ++i) {
-        // expand R to 48
         uint64_t eR = expand32to48(R);
-        // XOR with subkey
         uint64_t sub = (((uint64_t)subkeysL[i]) << 24) | (uint64_t)subkeysR[i];
         uint64_t x = eR ^ sub;
         uint32_t s_out = sbox_subst(x);
@@ -252,7 +248,7 @@ void DES::encryptBlock(const uint8_t in[8], uint8_t out[8]) const {
         L = R;
         R = newR;
     }
-    // swap L and R before final permutation
+
     uint8_t preout[8];
     preout[0] = (R >> 24) & 0xFF;
     preout[1] = (R >> 16) & 0xFF;

@@ -8,7 +8,6 @@
 class DES {
 public:
     DES();
-    // key: 8 bytes
     void setKey(const std::array<uint8_t,8>& key);
     // encrypt/decrypt one 8-byte block
     void encryptBlock(const uint8_t in[8], uint8_t out[8]) const;

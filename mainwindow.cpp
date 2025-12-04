@@ -38,13 +38,9 @@ void MainWindow::setupUi()
     txtAlgorithm->setReadOnly(true);
     txtAlgorithm->setMinimumHeight(150);
     txtAlgorithm->setPlainText(tr(
-        "Алгоритм: DES (Data Encryption Standard) в режиме CBC.\n\n"
-        "Режим CBC: каждый блок XOR'ится с предыдущим шифротекстным блоком перед шифрованием. "
-        "Первоначально используется IV (initialization vector). IV генерируется случайно при шифровании "
-        "и записывается в начало выходного файла. При расшифровании IV читается из начала входного файла.\n\n"
-        "Ключ: 8 байт. В этой реализации ключ получается из пароля через MD5 и берутся первые 8 байт хеша.\n\n"
-        "Padding: PKCS#7 (количество добавляемых байт равно числу байт заполнения, от 1 до 8).\n\n"
-        "Программа поддерживает чтение/запись любых бинарных файлов (word, excel, изображения и др.)."
+            "Алгоритм DES: Симметричный блочный шифр с ключом 56 бит (64 бита с учётом контрольных битов).\n"
+            "Операция шифрования (функция E) преобразует один блок открытого текста (64 бита) в блок шифротекста (64 бита) с использованием ключа.\n"
+            "Режим CBC (Cipher Block Chaining): Способ обработки последовательности блоков данных, при котором шифрование каждого блока зависит от результата шифрования предыдущего. Это режим работы блочного шифра, а не сам шифр."
         ));
 
     // File selection
@@ -75,11 +71,6 @@ void MainWindow::setupUi()
 
     btnProcess = new QPushButton(tr("Выполнить"));
     connect(btnProcess, &QPushButton::clicked, this, &MainWindow::processFile);
-
-    progress = new QProgressBar;
-    progress->setMinimum(0);
-    progress->setMaximum(100);
-    progress->setValue(0);
 
     // Layouts
     QVBoxLayout *mainL = new QVBoxLayout;
@@ -119,19 +110,34 @@ void MainWindow::setupUi()
     mainL->addWidget(gbPass);
 
     mainL->addWidget(btnProcess);
-    mainL->addWidget(progress);
 
     w->setLayout(mainL);
 
     setWindowTitle(tr("DES-CBC — шифрование/расшифрование (Qt)"));
-    resize(800, 600);
+    resize(500, 350);
 
     onModeChanged();
 }
 
 void MainWindow::chooseSource()
 {
-    QString fn = QFileDialog::getOpenFileName(this, tr("Выберите исходный файл"));
+    QString filter;
+
+    // Если выбран режим "Расшифрование" → показываем только *.enc
+    if (rbDecrypt->isChecked()) {
+        filter = tr("Зашифрованные файлы (*.enc)");
+    }
+    else {
+        filter = tr("Все файлы (*.*)");
+    }
+
+    QString fn = QFileDialog::getOpenFileName(
+        this,
+        tr("Выберите исходный файл"),
+        QString(),
+        filter
+        );
+
     if (!fn.isEmpty()) {
         sourcePath = fn;
         leSource->setText(fn);
@@ -140,8 +146,30 @@ void MainWindow::chooseSource()
 
 void MainWindow::chooseDestination()
 {
-    QString fn = QFileDialog::getSaveFileName(this, tr("Выберите файл назначения"));
+    QString filter;
+
+    // Если шифрование — сохраняем только .enc
+    if (rbEncrypt->isChecked()) {
+        filter = tr("Зашифрованный файл (*.enc)");
+    }
+    else {
+        filter = tr("Все файлы (*.*)");
+    }
+
+    QString fn = QFileDialog::getSaveFileName(
+        this,
+        tr("Выберите файл назначения"),
+        QString(),
+        filter
+        );
+
+    // Если шифрование — автоматически добавляем .enc,
+    // чтобы пользователь вручную его не забыл.
     if (!fn.isEmpty()) {
+
+        if (rbEncrypt->isChecked() && !fn.endsWith(".enc"))
+            fn += ".enc";
+
         destPath = fn;
         leDest->setText(fn);
     }
@@ -159,6 +187,8 @@ void MainWindow::choosePasswordFile()
 
 void MainWindow::onModeChanged()
 {
+    leDest->setText("");
+    leSource->setText("");
     bool passFile = rbPassFile->isChecked();
     lePassword->setEnabled(!passFile);
     btnPassFile->setEnabled(passFile);
@@ -209,52 +239,41 @@ bool MainWindow::readPassword(std::vector<uint8_t>& out)
 
 bool MainWindow::encryptStream(QFile &inFile, QFile &outFile, const std::array<uint8_t,8>& key)
 {
-    // генерируем IV
     std::array<uint8_t,8> iv;
     for (int i=0;i<8;++i) iv[i] = (uint8_t)QRandomGenerator::global()->bounded(0,256);
 
     // записываем IV в начало выходного файла
     if (outFile.write(reinterpret_cast<const char*>(iv.data()), 8) != 8) return false;
 
+    // считываем весь входной файл (для простоты и корректного паддинга)
+    QByteArray data = inFile.readAll();
+
+    // PKCS#7 padding: всегда добавляем от 1 до 8 байт
+    const int block = 8;
+    int pad = block - (data.size() % block);
+    if (pad == 0) pad = block;
+    data.append(QByteArray(pad, static_cast<char>(pad)));
+
     DES des;
     des.setKey(key);
 
-    const int block = 8;
-    QByteArray buffer;
-    buffer.resize(block);
-
-    qint64 total = inFile.size();
-    qint64 processed = 0;
-    progress->setValue(0);
-
-    // CBC: prev = IV
     std::array<uint8_t,8> prev = iv;
+    uint8_t inb[8], outb[8];
 
-    // читаем блоками
-    while (!inFile.atEnd()) {
-        qint64 toRead = qMin<qint64>(block, inFile.size() - inFile.pos());
-        QByteArray chunk = inFile.read(toRead);
-        if (chunk.size() < block) {
-            // pad PKCS#7
-            int pad = block - chunk.size();
-            chunk.append(QByteArray(pad, (char)pad));
-        }
-        // если chunk size == 8, можем обработать прямо
-        uint8_t inb[8];
-        memcpy(inb, chunk.constData(), 8);
-        // XOR with prev
+    qint64 totalBlocks = data.size() / block;
+    for (qint64 bi = 0; bi < totalBlocks; ++bi) {
+        memcpy(inb, data.constData() + bi*block, block);
+        // XOR with prev (CBC)
         for (int i=0;i<8;++i) inb[i] ^= prev[i];
-        uint8_t outb[8];
+
         des.encryptBlock(inb, outb);
         if (outFile.write(reinterpret_cast<const char*>(outb), 8) != 8) return false;
+
         // prev = outb
         for (int i=0;i<8;++i) prev[i] = outb[i];
 
-        processed += toRead;
-        int perc = int((processed*100)/total);
-        progress->setValue(qMin(perc, 99)); // финал будет 100 в конце
     }
-    progress->setValue(100);
+
     return true;
 }
 
@@ -270,7 +289,6 @@ bool MainWindow::decryptStream(QFile &inFile, QFile &outFile, const std::array<u
     const int block = 8;
     qint64 total = inFile.size(); // уже после чтения 8 байт
     qint64 processed = 0;
-    progress->setValue(0);
 
     std::array<uint8_t,8> prev;
     for (int i=0;i<8;++i) prev[i] = iv[i];
@@ -306,13 +324,11 @@ bool MainWindow::decryptStream(QFile &inFile, QFile &outFile, const std::array<u
             }
             if (outFile.write(reinterpret_cast<const char*>(dec), 8 - pad) != (8 - pad)) return false;
             processed += block;
-            progress->setValue(100);
+
             break;
         } else {
             if (outFile.write(reinterpret_cast<const char*>(dec), 8) != 8) return false;
             processed += block;
-            int perc = int((processed*100)/total);
-            progress->setValue(qMin(perc, 99));
             // shift
             for (int i=0;i<8;++i) prev[i] = (uint8_t)cur_in[i];
             cur = next;
@@ -341,7 +357,7 @@ void MainWindow::processFile()
 
     QFile outFile(destPath);
     if (!outFile.open(QIODevice::WriteOnly)) {
-        QMessageBox::warning(this, tr("Ошибка"), tr("Не удалось открыть файл назначения для записи."));
+        QMessageBox::warning(this, "Ошибка", "Не удалось открыть файл назначения для записи.");
         inFile.close();
         return;
     }
@@ -366,9 +382,9 @@ void MainWindow::processFile()
     outFile.close();
 
     if (ok) {
-        QMessageBox::information(this, tr("Готово"), tr("Операция завершена успешно."));
+        QMessageBox::information(this, "Готово", "Операция завершена успешно.");
     } else {
-        QMessageBox::warning(this, tr("Ошибка"), tr("Во время операции произошла ошибка."));
+        QMessageBox::warning(this, "Ошибка", "Во время операции произошла ошибка.");
     }
-    progress->setValue(100);
+
 }

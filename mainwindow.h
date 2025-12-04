@@ -47,7 +47,7 @@ private:
     QLineEdit *lePassword;
     QPushButton *btnPassFile;
     QPushButton *btnProcess;
-    QProgressBar *progress;
+
 
     QString sourcePath;
     QString destPath;
