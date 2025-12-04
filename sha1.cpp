@@ -25,14 +25,11 @@ void SHA1::reset() {
 void SHA1::update(const unsigned char* data, size_t len) {
     if (!data || len == 0) return;
 
-    // Добавляем длину в битах
     messageLength += len * 8;
 
-    // Добавляем данные в буфер
     for (size_t i = 0; i < len; i++) {
         buffer.push_back(data[i]);
 
-        // Если буфер заполнен (64 байта), обрабатываем блок
         if (buffer.size() == 64) {
             processBlock(buffer.data());
             buffer.clear();
@@ -51,7 +48,6 @@ void SHA1::update(const std::string& data) {
 void SHA1::processBlock(const unsigned char block[64]) {
     uint32_t w[80];
 
-    // Разбиваем блок на 16 слов
     for (int i = 0; i < 16; ++i) {
         w[i] = (static_cast<uint32_t>(block[i*4]) << 24) |
                (static_cast<uint32_t>(block[i*4 + 1]) << 16) |
@@ -59,19 +55,16 @@ void SHA1::processBlock(const unsigned char block[64]) {
                static_cast<uint32_t>(block[i*4 + 3]);
     }
 
-    // Расширяем 16 слов до 80
     for (int i = 16; i < 80; ++i) {
         w[i] = rol(w[i-3] ^ w[i-8] ^ w[i-14] ^ w[i-16], 1);
     }
 
-    // Инициализируем рабочие переменные
     uint32_t a = h0;
     uint32_t b = h1;
     uint32_t c = h2;
     uint32_t d = h3;
     uint32_t e = h4;
 
-    // Основной цикл
     for (int i = 0; i < 80; ++i) {
         uint32_t f, k;
 
@@ -97,7 +90,6 @@ void SHA1::processBlock(const unsigned char block[64]) {
         a = temp;
     }
 
-    // Добавляем к результату
     h0 += a;
     h1 += b;
     h2 += c;
@@ -106,15 +98,12 @@ void SHA1::processBlock(const unsigned char block[64]) {
 }
 
 void SHA1::padMessage() {
-    // Добавляем бит '1'
     buffer.push_back(0x80);
 
-    // Добавляем нули до тех пор, пока длина не станет ≡ 56 mod 64
     while (buffer.size() % 64 != 56) {
         buffer.push_back(0x00);
     }
 
-    // Добавляем длину исходного сообщения в битах (big-endian)
     uint64_t bitLength = messageLength;
 
     for (int i = 7; i >= 0; --i) {
@@ -123,20 +112,16 @@ void SHA1::padMessage() {
 }
 
 std::vector<unsigned char> SHA1::digest() {
-    // Создаем копию состояния
     SHA1 copy = *this;
 
-    // Применяем паддинг к копии
     copy.padMessage();
 
-    // Обрабатываем все блоки паддинга
     for (size_t i = 0; i < copy.buffer.size(); i += 64) {
         if (i + 64 <= copy.buffer.size()) {
             copy.processBlock(copy.buffer.data() + i);
         }
     }
 
-    // Формируем результат (big-endian)
     std::vector<unsigned char> result(20);
 
     result[0]  = static_cast<unsigned char>((copy.h0 >> 24) & 0xFF);

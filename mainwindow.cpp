@@ -14,7 +14,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     QVBoxLayout *main = new QVBoxLayout(central);
 
-    //================ ДАННЫЕ СТУДЕНТА =================
     QGroupBox *groupStudent = new QGroupBox("Данные студента");
     QGridLayout *layStudent = new QGridLayout(groupStudent);
 
@@ -30,7 +29,6 @@ MainWindow::MainWindow(QWidget *parent)
     main->addWidget(groupStudent);
 
 
-    //================ ОПИСАНИЕ SHA-1 =================
     QGroupBox *groupInfo = new QGroupBox("Описание алгоритма SHA-1");
     QVBoxLayout *layInfo = new QVBoxLayout(groupInfo);
 
@@ -42,8 +40,6 @@ MainWindow::MainWindow(QWidget *parent)
     layInfo->addWidget(infoText);
     main->addWidget(groupInfo);
 
-
-    //================ БЛОК ХЕШИРОВАНИЯ =================
     QGroupBox *groupHash = new QGroupBox("Хеширование файла");
     QGridLayout *layHash = new QGridLayout(groupHash);
 
@@ -63,7 +59,6 @@ MainWindow::MainWindow(QWidget *parent)
     layHash->addWidget(builtinLabel, 1, 2);
     layHash->addWidget(customLabel, 2, 2);
 
-    // Устанавливаем выравнивание для конкретных ячеек
     layHash->setAlignment(builtinLabel, Qt::AlignLeft | Qt::AlignVCenter);
     layHash->setAlignment(customLabel, Qt::AlignLeft | Qt::AlignVCenter);
 
@@ -80,23 +75,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     main->addWidget(groupHash);
 
-    //========= СВЯЗЫВАЕМ СЛОТЫ =============
     connect(btnChooseFile, &QPushButton::clicked, this, &MainWindow::chooseFile);
     connect(btnHash,       &QPushButton::clicked, this, &MainWindow::calcHash);
     connect(btnSave,       &QPushButton::clicked, this, &MainWindow::saveHash);
 }
 
-
-//=====================================================
-// 1) Выбор файла
 void MainWindow::chooseFile() {
     QString path = QFileDialog::getOpenFileName(this, "Выбор файла");
     if (!path.isEmpty()) editFilePath->setText(path);
 }
 
-
-//=====================================================
-// 2) Вычисление SHA-1
 void MainWindow::calcHash() {
     QFile file(editFilePath->text());
     if (!file.open(QIODevice::ReadOnly)) {
@@ -111,15 +99,11 @@ void MainWindow::calcHash() {
         return;
     }
 
-    // Создаем объект SHA-1
     SHA1 sha;
 
-    // Обновляем хеш данными файла
-    // Вариант 1: Используем update с указателем и размером
     sha.update(reinterpret_cast<const unsigned char*>(data.constData()),
                static_cast<size_t>(data.size()));
 
-    // Получаем хеш в виде строки
     QString ourHash = QString::fromStdString(sha.hexdigest());
 
     QByteArray hash = QCryptographicHash::hash(data, QCryptographicHash::Sha1).toHex();
@@ -128,9 +112,6 @@ void MainWindow::calcHash() {
     editHash->setText(hash);
 }
 
-
-//=====================================================
-// 3) Сохранение в .txt
 void MainWindow::saveHash() {
     QString fileName = QFileDialog::getSaveFileName(this,"Сохранить", "hash.txt");
     if (fileName.isEmpty()) return;

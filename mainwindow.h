@@ -23,7 +23,6 @@ private slots:
     void saveHash();
 
 private:
-    // элементы формы
     QLineEdit *editFio;
     QLineEdit *editGroup;
     QLineEdit *editVariant;
